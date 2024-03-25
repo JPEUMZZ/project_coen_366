@@ -1,101 +1,48 @@
-import threading
+
 import socket
-host = socket.gethostbyname(socket.gethostname())
-port = 5050
-#TCP
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((host, port))
-server.listen()
-clients = []
-aliases = []
+import threading
 
+# Server details
+SERVER_IP = socket.gethostbyname(socket.gethostname())
+SERVER_PORT = 3000
+BUFFER_SIZE = 1024
 
-def broadcast(message):
-    for client in clients:
-        client.send(message)
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server_socket.bind((SERVER_IP, SERVER_PORT))
 
-# Function to handle clients'connections
+# Dictionary to store user data: {username: (IP, Port)}
+users = {}
 
-
-def handle_client(client):
+# Handle client messages
+def handle_client_message(client_socket, client_address):
     while True:
-        try:
-            message = client.recv(1024)
-            broadcast(message)
-        except:
-            index = clients.index(client)
-            clients.remove(client)
-            client.close()
-            alias = aliases[index]
-            broadcast(f'{alias} has left the chat room!'.encode('utf-8'))
-            aliases.remove(alias)
-            break
-# Main function to receive the clients connection
-
-
-def receive():
-    while True:
-        print('Server is running and listening ...')
-        client, address = server.accept()
-        print(f'connection is established with {str(address)}')
-        client.send('alias?'.encode('utf-8'))
-        alias = client.recv(1024)
-        aliases.append(alias)
-        clients.append(client)
-        print(f'The alias of this client is {alias}'.encode('utf-8'))
-        broadcast(f'{alias} has connected to the chat room'.encode('utf-8'))
-        client.send('you are now connected!'.encode('utf-8'))
-        thread = threading.Thread(target=handle_client, args=(client,))
-        thread.start()
-
-
-if __name__ == "__main__":
-    receive()
-
-
-
-
-# import socket
-# import threading
-
-# HEADER = 64
-# PORT = 5050
-# SERVER = socket.gethostbyname(socket.gethostname())
-# ADDR = (SERVER, PORT)
-# FORMAT = 'utf-8'
-# DISCONNECT_MESSAGE = "!DISCONNECT"
-
-# server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# server.bind(ADDR)
- 
-# def handle_client(conn, addr):
-#     print(f"[NEW CONNECTION] {addr} connected.")
-
-#     connected = True
-#     while connected:
-#         msg_length = conn.recv(HEADER).decode(FORMAT)
-#         if msg_length:
-#             msg_length = int(msg_length)
-#             msg = conn.recv(msg_length).decode(FORMAT)
-#             if msg == DISCONNECT_MESSAGE:
-#                 connected = False
-    
-#         print(f"[{addr}] {msg}")
-#         conn.send("Msg received" .encode(FORMAT))
+        message, client_address = client_socket.recvfrom(BUFFER_SIZE)
+        message = message.decode('utf-8')
+        print(f"Message from {client_address}: {message}")
         
-
-#     conn.close()
+        if message.startswith("REGISTER"):
+            _, username, ip, port = message.split()
+            if username in users:
+                response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
+            else:
+                users[username] = (ip, port)
+                response = f"REGISTRATION CONFIRMED for {username}."
+            client_socket.sendto(response.encode('utf-8'), client_address)
         
+        elif message.startswith("DEREGISTER"):
+            _, username = message.split()
+            if username in users:
+                del users[username]
+                response = f"{username} deregistered successfully."
+            else:
+                response = f"{username} is not registered."
+            client_socket.sendto(response.encode('utf-8'), client_address)
+
+# Create UDP server socket
 
 
-# def start():
-#     server.listen()
-#     print(f"[LISTENING] Server is listening on {SERVER}")
-#     while True:
-#        conn, addr = server.accept()
-#        thread = threading.Thread(target=handle_client, args=(conn, addr))
-#        thread.start()
-#        print(f"[ACTIVE CONNECTIONS] {threading.activeCount() - 1}")
+print(f"UDP server listening on {SERVER_IP}:{SERVER_PORT}")
 
-# print("[STARTING] server is starting...")
-# start()
+while True:
+    message, client_address = server_socket.recvfrom(BUFFER_SIZE)
+    threading.Thread(target=handle_client_message, args=(server_socket, client_address)).start()
