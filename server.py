@@ -14,7 +14,7 @@ users = {}
 
 def send_notification(message):
     for username, user_details in users.items():
-        server_socket.sendto(message.encode('utf-8'), user_details["adress"])
+        server_socket.sendto(message.encode('utf-8'), user_details["address"])
 
 
 def handle_client_message(message, client_address):
@@ -28,7 +28,7 @@ def handle_client_message(message, client_address):
             if username in users:
                 response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
             else:
-                users[username] = {"IP":ip , "port":port, "adress":client_address}
+                users[username] = {"IP":ip , "port":port, "address":client_address}
                 response = f"REGISTRATION CONFIRMED for {username}."
                 notification = f"{username} has registered."
                 send_notification(notification)
