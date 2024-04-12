@@ -1,66 +1,86 @@
 import socket
 import sys
 import threading
+import json
 
 BUFFER_SIZE = 1024
 
 class Server(threading.Thread):
     def __init__(self, port):
-        super(server, self).__init__()
-        self.sock = socket
+        super(Server, self).__init__()
+        self.server_socket = socket
         self.HOST_NAME = socket.gethostname()
-        self.HOST = self.sock.gethostbyname(self.HOST_NAME)
-        self.PORT = port
+        self.SERVER_IP = self.server_socket.gethostbyname(self.HOST_NAME) # host
+        self.PORT = port # port number
         self.users = {}
         self.create_socket()
 
     def create_socket(self):
         try:
             print("Creation of socket in progress...")
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # creates a UDP socket
 
         except socket.error as msg:
             print(f"Error creating socket. Code {str(msg[0])}: {str(msg[1])}")
             sys.exit()
 
-        print("Created socket")
-        self.configure_socket()
+        print("Created socket...")
 
-    def configure_socket(self):
         try:
-            print(f"Binding SERVER host {self.HOST} and port {self.PORT}")
-            self.sock.socket.bind(self.HOST, self.PORT)
+            self.server_socket.bind((self.SERVER_IP, self.PORT))  # server IP and port number
 
         except socket.error as msg:
             print(f"Binding of socket failed. Code {str(msg[0])}: {str(msg[1])}")
             sys.exit()
 
-        print("Socket configured.")
+        print("Socket configured. Server is up.")
+        print(f"UDP server is listening on {self.SERVER_IP}:{self.PORT}")
+        while True: # listens on socket, then creates thread
+            message, client_address = self.server_socket.recvfrom(BUFFER_SIZE)
+            threading.Thread(target=self.listening, args=(message, client_address)).start()
 
-    def listening(self, client_socket, client_address):
-        while True:
-            message, client_address = client_socket.recvfrom(BUFFER_SIZE)
-            message = message.decode('utf-8')
-            print(f"Message from {client_address}: {message}")
+    # send notification to everyone on the users list
+    def send_notification(self, message):
+        for username, user_details in self.users.items():
+            self.server_socket.sendto(message.encode('utf-8'), user_details["address"])
 
-            if message.startswith("REGISTER"):
-                _, username, ip, port = message.split()
+    def listening(self, message, client_address):
+        msg = message.decode('utf-8')
+        print(f"Message incoming from {client_address}: {message}")
+
+        # registration
+        if msg.startswith("REGISTER"):
+            parts = message.split()
+            if len(parts) == 4:
+                _, username, ip, port = parts
                 if username in self.users:
                     response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
+                    print(f"Registration Denied for {username}.")
                 else:
-                    self.users[username] = (ip, port)
+                    self.users[username] = {"IP": ip, "port": port, "address": client_address}
                     response = f"REGISTRATION CONFIRMED for {username}."
-                client_socket.sendto(response.encode('utf-8'), client_address)
+                    notification = f"{username} has registered."
+                    self.send_notification(notification)
+            else:
+                response = "Invalid registration message format."
+            self.server_socket.sendto(response.encode('utf-8'), client_address)
 
-            elif message.startswith("DEREGISTER"):
-                _, username = message.split()
-                if username in self.users:
-                    del self.users[username]
-                    response = f"{username} deregistered successfully."
-                else:
-                    response = f"{username} is not registered."
-                client_socket.sendto(response.encode('utf-8'), client_address)
-            # threading.Thread(target=handle_client_message, args=(server_socket, client_address)).start()
+        # deregister
+        elif msg.startswith("DEREGISTER"):
+            _, username = message.split()
+            if username in self.users:
+                del self.users[username]
+                response = f"{username} deregistered successfully."
+                notification = f"{username} has deregistered."
+                self.send_notification(notification)
+            else:
+                response = f"{username} is not registered."
+            self.server_socket.sendto(response.encode('utf-8'), client_address)
+
+    def close(self):
+        self.server_socket.close()
 
 SERVER_PORT = 3000
 server = Server(SERVER_PORT)
+server.start()
+server.close()
