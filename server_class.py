@@ -1,7 +1,7 @@
 import socket
 import sys
 import threading
-import json
+import time
 
 BUFFER_SIZE = 1024
 
@@ -35,6 +35,7 @@ class Server(threading.Thread):
 
         print("Socket configured. Server is up.")
         print(f"UDP server is listening on {self.SERVER_IP}:{self.PORT}")
+        threading.Thread(target=self.update).start()
         while True: # listens on socket, then creates thread
             message, client_address = self.server_socket.recvfrom(BUFFER_SIZE)
             threading.Thread(target=self.listening, args=(message, client_address)).start()
@@ -77,7 +78,16 @@ class Server(threading.Thread):
                 response = f"{username} is not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
-    def close(self):
+    def update(self):
+      while True:
+           if self.users:
+               for username, user_details in self.users.items():
+                   user_info = f"Username :{username} IP:{user_details['IP']} Port: {user_details['port']}"
+                   self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
+           time.sleep(300)
+
+
+def close(self):
         self.server_socket.close()
 
 SERVER_PORT = 3000
