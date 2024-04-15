@@ -12,6 +12,7 @@ class Client(threading.Thread):
         self.CLIENT_IP = self.client_socket.gethostbyname(self.HOST_NAME)
         self.SERVER_IP = input("Which Server IP would you like to connect to: ")
         self.SERVER_PORT = int(input("What is the server port: "))
+        self.client_PORT = 3003
         self.username = input(f"Enter you name: ").strip()
 
         try:
@@ -30,7 +31,7 @@ class Client(threading.Thread):
         receive_thread.start()
 
     def register(self):
-        message = f"REGISTER {self.username} {self.CLIENT_IP} {self.SERVER_PORT}"
+        message = f"REGISTER {self.username} {self.CLIENT_IP} {self.client_PORT}"
         self.client_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
     def deregister(self):
@@ -44,6 +45,8 @@ class Client(threading.Thread):
                 self.register()
             elif message == "DEREGISTER":
                 self.deregister()
+            elif message.startswith("UPDATE-CONTACT"):
+                self.update_contact()
 
     def client_receive(self):
         while True:
@@ -56,5 +59,12 @@ class Client(threading.Thread):
                 self.client_socket.close()
                 break
 
-Client = Client()
+    def update_contact(self):
+        new_ip = input("What's your new IP address? ")
+        new_port = input("What's your new port number? ")
+        update_message = f"UPDATE-CONTACT {self.username} {new_ip} {new_port}"
+        self.client_socket.sendto(update_message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
+        self.SERVER_IP = new_ip
+        self.SERVER_PORT = new_port
 
+Client = Client()
