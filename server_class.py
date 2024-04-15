@@ -41,6 +41,7 @@ class Server(threading.Thread):
 
     # send notification to everyone on the users list
     def send_notification(self, message):
+        message = f"Global Message: {message}"
         for username, user_details in self.users.items():
             self.server_socket.sendto(message.encode('utf-8'), user_details["address"])
 
@@ -57,7 +58,7 @@ class Server(threading.Thread):
                     response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
                     print(f"Registration Denied for {username}.")
                 else:
-                    self.users[username] = {"IP": ip, "port": port, "address": client_address}
+                    self.users[username] = {"IP": ip, "port": port, "address": client_address, "files": []}
                     response = f"REGISTRATION CONFIRMED for {username}."
                     notification = f"{username} has registered."
                     self.send_notification(notification)
@@ -76,6 +77,36 @@ class Server(threading.Thread):
             else:
                 response = f"{username} is not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
+
+        # wants to say that it has this file
+        elif msg.startswith("UPLOADFILE"):
+            _, username, filename = message.split()
+            if username in self.users:
+                if filename not in self.users[username]["files"]:
+                    self.users[username]["files"].append(filename)
+                    response = f"{username} uploaded {filename} successfully."
+                    notification = f"{username} has uploaded {filename} onto server."
+                    self.send_notification(notification)
+                else:
+                    response = f"File already exists on server under {username}. Did not append."
+            else:
+                response = f"You do not have permission, as you are not registered."
+            self.server_socket.sendto(response.encode('utf-8'), client_address)
+
+        # transferfile, wants a file from someone
+        elif msg.startswith("DOWNLOADFILE"):
+            _, username, filename = message.split()
+            if username in self.users:
+                for user in self.users:
+                    if filename in self.users[user]["files"]:
+                        response = f"File exists on server under {user}. IP: {self.users[user]['IP']} PORT: {self.users[user]['port']}"
+                    else:
+                        response = f"File does not exist anywhere. Request for file: {filename} denied."
+            self.server_socket.sendto(response.encode('utf-8'), client_address)
+
+        # do nothing here, just taking file from client
+        elif msg.startswith("CLIENTCONNECT"):
+            pass
 
     def close(self):
         self.server_socket.close()
