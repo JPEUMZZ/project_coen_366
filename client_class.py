@@ -32,17 +32,17 @@ class Client(threading.Thread):
         receive_thread = threading.Thread(target=self.client_receive)
         receive_thread.start()
 
-        clientrecv_udp_thread = threading.Thread(target=self.clientsend_udp)
-        clientrecv_udp_thread.start()
+        clientsend_udp_thread = threading.Thread(target=self.clientsend_udp)
+        clientsend_udp_thread.start()
 
         # JUNIOR UNCOMMENT THIS, THE LINE BELOW IS SUPPOSE TO RECEIVE COMMAND FROM OTHER CLIENT FIRST AS UDP THEN TCP
-        #clientsend_udp_thread = threading.Thread(target=self.clientreceive_udp)
-        #clientsend_udp_thread.start()
+        #clientrecv_udp_thread = threading.Thread(target=self.clientreceive_udp)
+        #clientrecv_udp_thread.start()
 
-    def clientsend_udp(self):
+    def clientsend_udp(self): # this checks if the client puts in console CLIENTCONNECT, then it will try to connect with client
         while True:
             message = input("").strip()
-            if message == "CLIENTCONNECT":
+            if message == "CLIENTCONNECT": # if input CLIENTCONNECT, ask for ip and port of the desired client
                 self.client2clientUDP()
             else:
                 continue
