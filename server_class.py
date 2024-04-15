@@ -94,7 +94,7 @@ class Server(threading.Thread):
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
         # transferfile, wants a file from someone
-        elif msg.startswith("DOWNLOADFILE"):
+        elif msg.startswith("CHECKFILE"):
             _, username, filename = message.split()
             if username in self.users:
                 for user in self.users:
@@ -105,7 +105,7 @@ class Server(threading.Thread):
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
         # do nothing here, just taking file from client
-        elif msg.startswith("CLIENTCONNECT"):
+        elif msg.startswith("CLIENTCONNECT"): # this message is meant to be sent to other clients
             pass
 
     def close(self):
