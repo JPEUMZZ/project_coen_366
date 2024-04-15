@@ -44,6 +44,8 @@ class Client(threading.Thread):
                 self.register()
             elif message == "DEREGISTER":
                 self.deregister()
+            elif message.startswith("UPDATE-CONTACT"):
+                self.update_contact()
 
     def client_receive(self):
         while True:
@@ -56,5 +58,13 @@ class Client(threading.Thread):
                 self.client_socket.close()
                 break
 
-Client = Client()
+    def update_contact(self):
+        new_ip = input("What's your new IP address? ")
+        new_port = input("What's your new port number? ")
+        update_message = f"UPDATE-CONTACT {self.username} {new_ip} {new_port}"
+        self.client_socket.sendto(update_message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
+        self.SERVER_IP = new_ip
+        self.SERVER_PORT = new_port
+ 
 
+Client = Client()

@@ -1,7 +1,7 @@
 import socket
 import sys
 import threading
-import time
+import json
 
 BUFFER_SIZE = 1024
 
@@ -35,7 +35,6 @@ class Server(threading.Thread):
 
         print("Socket configured. Server is up.")
         print(f"UDP server is listening on {self.SERVER_IP}:{self.PORT}")
-        threading.Thread(target=self.update).start()
         while True: # listens on socket, then creates thread
             message, client_address = self.server_socket.recvfrom(BUFFER_SIZE)
             threading.Thread(target=self.listening, args=(message, client_address)).start()
@@ -46,7 +45,7 @@ class Server(threading.Thread):
             self.server_socket.sendto(message.encode('utf-8'), user_details["address"])
 
     def listening(self, message, client_address):
-        msg = message.decode('utf-8')
+        msg = message.decode('utf-8').strip()
         print(f"Message incoming from {client_address}: {message}")
 
         # registration
@@ -78,19 +77,19 @@ class Server(threading.Thread):
                 response = f"{username} is not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
-    def update(self):
-      while True:
-           user_update = "UPDATE: "
-           self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
-           if self.users:
-               for username, user_details in self.users.items():
-                   user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
-                   for username, user_details in self.users.items():
-                     self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
-           time.sleep(60)
+        elif msg.startswith("UPDATE-CONTACT"):
+            parts = message.split()
+            if len(parts) == 4:
+                _, username, new_ip, new_udp_socket = parts
+                if username in self.users:
+                    self.users[username] = {"IP": new_ip, "port": new_udp_socket, "address": client_address}
+                    response = f"UPDATE-CONFIRMED {username} {new_ip} {new_udp_socket}"
 
+                else:
+                    response = "UPDATE FAILED: User not found."
+                self.server_socket.sendto(response.encode('utf-8'), client_address)
 
-def close(self):
+    def close(self):
         self.server_socket.close()
 
 SERVER_PORT = 3000
