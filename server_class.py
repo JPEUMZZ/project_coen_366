@@ -80,9 +80,10 @@ class Server(threading.Thread):
 
     def update(self):
       while True:
-           user_update = "UPDATE: "
-           self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
+          
            if self.users:
+               user_update = "UPDATE: "
+               self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
                for username, user_details in self.users.items():
                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
                    for username, user_details in self.users.items():
