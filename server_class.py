@@ -47,13 +47,13 @@ class Server(threading.Thread):
 
     def listening(self, message, client_address):
         msg = message.decode('utf-8')
-        print(f"Message incoming from {client_address}: {message}")
-
+        
         # registration
         if msg.startswith("REGISTER"):
             parts = message.split()
             if len(parts) == 4:
                 _, username, ip, port = parts
+                print(f"Message incoming from {ip},{port}: {_}{username}")
                 if username in self.users:
                     response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
                     print(f"Registration Denied for {username}.")
@@ -70,6 +70,7 @@ class Server(threading.Thread):
         elif msg.startswith("DEREGISTER"):
             _, username = message.split()
             if username in self.users:
+                print(f"Message incoming from {self.users[username]["IP"]},{self.users[username]["port"]}: {_}{username}")
                 del self.users[username]
                 response = f"{username} deregistered successfully."
                 notification = f"{username} has deregistered."
@@ -78,12 +79,27 @@ class Server(threading.Thread):
                 response = f"{username} is not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
+        elif msg.startswith("UPDATE-CONTACT"):
+            parts = message.split()
+            if len(parts) == 4:
+                _, username, new_ip, new_udp_socket = parts
+                if username in self.users:
+                    print(f"Message incoming from {new_ip},{new_udp_socket}: {_}{username}")
+                    self.users[username] = {"IP": new_ip, "port": new_udp_socket, "address": client_address}
+                    response = f"UPDATE-CONFIRMED {username} {new_ip} {new_udp_socket}"
+
+                else:
+                    response = "UPDATE FAILED: User not found."
+                self.server_socket.sendto(response.encode('utf-8'), client_address)
+
     def update(self):
       while True:
           
            if self.users:
                user_update = "UPDATE: "
-               self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
+               for username, user_details in self.users.items():
+                 self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"]) 
+
                for username, user_details in self.users.items():
                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
                    for username, user_details in self.users.items():
