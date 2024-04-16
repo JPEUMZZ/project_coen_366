@@ -58,7 +58,7 @@ class Server(threading.Thread):
                     response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
                     print(f"Registration Denied for {username}.")
                 else:
-                    self.users[username] = {"IP": ip, "port": port, "address": client_address}
+                    self.users[username] = {"IP": ip, "port": port, "address": client_address,"files": []}
                     response = f"REGISTRATION CONFIRMED for {username}."
                     notification = f"{username} has registered."
                     self.send_notification(notification)
@@ -92,6 +92,36 @@ class Server(threading.Thread):
                     response = "UPDATE FAILED: User not found."
                 self.server_socket.sendto(response.encode('utf-8'), client_address)
 
+        elif msg.startswith("UPLOADFILE"):
+            _, username, filename = message.split()
+            if username in self.users:
+                print(f"Message incoming from {self.users[username]["IP"]},{self.users[username]["port"]}: {_}{filename}")
+                if filename not in self.users[username]["files"]:
+                    self.users[username]["files"].append(filename)
+                    response = f"{username} uploaded {filename} successfully."
+                    notification = f"{username} has uploaded {filename} onto server."
+                    self.send_notification(notification)
+                else:
+                    response = f"File already exists on server under {username}. Did not append."
+            else:
+                response = f"You do not have permission, as you are not registered."
+            self.server_socket.sendto(response.encode('utf-8'), client_address)
+
+        elif msg.startswith("CHECKFILE"):
+            _, username, filename = message.split()
+            if username in self.users:
+                print(f"Message incoming from {self.users[username]["IP"]},{self.users[username]["port"]}: {_}{filename}")
+                for user in self.users:
+                    if filename in self.users[user]["files"]:
+                        response = f"File exists on server under {user}. adress: {self.users[user]['address']}"
+                    else:
+                        response = f"File does not exist anywhere. Request for file: {filename} denied."
+            self.server_socket.sendto(response.encode('utf-8'), client_address)
+        # do nothing here, just taking file from client
+        elif msg.startswith("CLIENTCONNECT"): # this message is meant to be sent to other clients
+            pass
+
+
     def update(self):
       while True:
           
@@ -101,7 +131,7 @@ class Server(threading.Thread):
                  self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"]) 
 
                for username, user_details in self.users.items():
-                   user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
+                   user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']} available files: {user_details['files']}"
                    for username, user_details in self.users.items():
                      self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
            time.sleep(60)
