@@ -32,38 +32,36 @@ class Client(threading.Thread):
         receive_thread = threading.Thread(target=self.client_receive)
         receive_thread.start()
 
-        # JUNIOR UNCOMMENT THIS, THE LINE BELOW IS SUPPOSE TO RECEIVE COMMAND FROM OTHER CLIENT FIRST AS UDP THEN TCP
-        #clientrecv_udp_thread = threading.Thread(target=self.clientreceive_udp)
+        clientrecv_udp_thread = threading.Thread(target=self.ClientFileProvider_udp) # as a seperate thread always listening
         #clientrecv_udp_thread.start()
 
-    def clientreceive_udp(self):
+    def ClientFileProvider_udp(self): # the client that wants to receive file, will initially make request
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            while True: # want to continuoulsy listen for anything from other clients
+            s.bind((self.client2client_socket, self.SERVER_PORT)) # might need to change port
+            while True: # want to continuously listen for anything from other clients
                 data, address = s.recvfrom(BUFFER_SIZE)
-                message = data.decode('utf-8')
-                command, filename = message
-                if command.startswith("CONNECT"): # if receive message from client as connect
-                    try:
-                        _, filename = data.decode('utf-8')
-                        if os.path.exists(filename):
-                            answer = input(f"File {filename} is being requested by {address}. "
-                                           f"Do we send it? (ACCEPT/REJECT): ")
-                            message = answer.upper().encode('utf-8')
-                            if answer.upper() == "ACCEPT":
-                                s.sendto(message, address)
-                                s.close()
-                                thread = threading.Thread(self.start_sender(address, filename))
-                                thread.start()
+                clientrecv_thread = threading.Thread(target=self.ClientFileProvider_Thread, args=(s, data, address))
+                clientrecv_thread.start()
+            socket.close()
 
-                        message = f"REJECT" # auto reject if file doesnt exist
-                        s.sendto(message.encode('utf-8'), address)
-                        s.close()
-                        break
+    def ClientFileProvider_Thread(self, socketUDP, data, address):
+        message = data.decode('utf-8')
+        command, filename = message  # make this a separate thread
+        if command.startswith("CONNECT"):  # if receive message from client as connect
+            try:
+                if os.path.exists(filename):
+                    answer = input(f"File {filename} is being requested by {address}. "
+                                   f"Do we send it? (ACCEPT/REJECT): ")
+                    messageSend = answer.upper().encode('utf-8') # send ACCEPT through UDP
+                    if answer.upper() == "ACCEPT":
+                        socketUDP.sendto(messageSend, address)
+                        self.start_sender(address, filename)
 
-                    except Exception as e:
-                        print(f'Error in receiving message: {e}')
-                        s.close()
-                        break
+                messageSend = f"REJECT"  # auto reject if file doesnt exist
+                socketUDP.sendto(messageSend.encode('utf-8'), address)
+
+            except Exception as e:
+                print(f'Error in receiving message: {e}')
 
     def register(self):
         message = f"REGISTER {self.username} {self.CLIENT_IP} {self.SERVER_PORT}"
@@ -83,19 +81,19 @@ class Client(threading.Thread):
         message = f"CHECKFILE {self.username} {filename}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
-    def client2clientUDP(self): # make a connection to client, should have received IP and port from server if it exists
+    def client2client_UDP(self): # make a connection to client, should have received IP and port from server if it exists
         ip = input("What is the IP of client that holds the file: ")
         port = input("What is the port of the client that holds the file: ")
         filename = input(f"What is the filename: ")
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
             message = f"CONNECT {filename}" # creates message to send to client
-            udp.sendto(message.encode('utf-8'), (ip, port)) # sends connect command to client
+            udp.sendto(message.encode('utf-8'), (ip, int(port))) # sends connect command to client
             data, address = udp.recvfrom(BUFFER_SIZE) # waits for accept or reject
             if data.decode('utf-8') == "ACCEPT": # if accept then close UDP
                 udp.close()
-                client_thread = threading.Thread(target=self.start_receiver(ip, port, filename)) # start TCP connection
-                client_thread.start()
+                print(f"{address} has accepted connection. Downloading {filename} now...")
+                self.start_receiver(ip, port, filename) # start TCP connection
             else:
                 if data.decode('utf-8') == "REJECT":
                     print(f"Rejected connection from {ip}:{port}. Could not receive file.")
@@ -113,7 +111,7 @@ class Client(threading.Thread):
             elif message == "CHECKFILE": # send command to check which file you want to download if it exists
                 self.filetransfer()
             elif message == "CLIENTCONNECT":  # this is for client2client command only, server will get it too
-                self.client2clientUDP()
+                self.client2client_UDP()
 
     def client_receive(self): # receive messages from server
         while True:
@@ -132,11 +130,19 @@ class Client(threading.Thread):
                 timeout = 5
                 tcp.settimeout(timeout)
                 tcp.connect((IP, port))
-                self.receive_file(tcp, filename)
-            except tcp.timeout:
+                with open(filename, 'wb') as file:
+                    while True:
+                        data, address = tcp.recv(BUFFER_SIZE)
+                        if not data:
+                            break
+                        file.write(data.decode('utf-8'))
+                    print(f"Finished downloading file {filename}.")
+            except socket.timeout:
                 print(f"Connection timed out on {IP}:{port} after {timeout} seconds. Could not establish TCP.")
             except Exception as e:
                 print(f"Error occured in start_receiver: {e}")
+
+            tcp.close()  # close tcp connection
 
     def start_sender(self, address, filename): # client that will send file to receiver
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcp:
@@ -146,26 +152,15 @@ class Client(threading.Thread):
                 connection, client_address = tcp.accept()
                 print(f"Connection established with {client_address}")
 
-                with open(filename, 'wb') as file:
+                with open(filename, 'rb') as file:
                     while True:
-                        char = file.read(1)
+                        char = file.read(BUFFER_SIZE)
                         if not char:
                             break
-                        tcp.sendto(char.encode('utf-8'), client_address)
-            except Exception as e:
+                        connection.sendall(char.encode('utf-8'), client_address)
+            except socket.error as e:
                 print(f"Error occured in start_sender: {e}")
-        tcp.close()
-
-    def receive_file(self, tcp_socket, filename): # receive character from sender client
-        with open(filename, 'rb') as file:
-            while True:
-                data = tcp_socket.recv(BUFFER_SIZE)
-                if not data:
-                    break
-                file.write(data)
-            print(f"Finished downloading file {filename}.")
-        tcp_socket.close() # close tcp connection
-
+            tcp.close()
 
 Client = Client()
 

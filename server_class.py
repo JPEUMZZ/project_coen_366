@@ -14,6 +14,7 @@ class Server(threading.Thread):
         self.PORT = port # port number
         self.users = {}
         self.create_socket()
+        self.mutex = threading.Lock()
 
     def create_socket(self):
         try:
@@ -100,6 +101,7 @@ class Server(threading.Thread):
                 for user in self.users:
                     if filename in self.users[user]["files"]:
                         response = f"File exists on server under {user}. IP: {self.users[user]['IP']} PORT: {self.users[user]['port']}"
+                        break
                     else:
                         response = f"File does not exist anywhere. Request for file: {filename} denied."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
