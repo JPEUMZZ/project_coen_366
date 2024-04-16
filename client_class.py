@@ -6,25 +6,43 @@ import os
 BUFFER_SIZE = 1024
 
 class Client(threading.Thread):
+    class_counter= 3001
+    lock = threading.Lock()
     def __init__(self):
         super(Client, self).__init__()
-        self.client2server_socket = socket
-        self.client2client_socket = socket
         self.HOST_NAME = socket.gethostname()
-        self.CLIENT_IP = self.client2server_socket.gethostbyname(self.HOST_NAME)
-        self.CLIENT_PORT = 3003
+        self.CLIENT_IP = socket.gethostbyname(self.HOST_NAME)
+        
         self.SERVER_IP = input("Which Server IP would you like to connect to: ")
         self.SERVER_PORT = int(input("What is the server port: "))
-        self.username = input(f"Enter you name: ").strip()
+        self.username = input("Enter your name: ").strip()
+
+        with Client.lock:
+            self.CLIENT_PORT = Client.class_counter
+            Client.class_counter += 1
 
         try:
             self.client2server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.client2client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         except socket.error as msg:
-            print(f"Error creating socket. Code {str(msg[0])}: {str(msg[1])}")
+            print(f"Error creating socket: {msg}")
             sys.exit()
 
         self.register()
         self.listen()
+
+
+
+    def create_socket(self):
+        self.client2client_socket.bind((self.SERVER_IP, self.PORT))
+        while True:
+            message, client_address = self.client2client_socket.recvfrom(BUFFER_SIZE)
+            threading.Thread(target=self.listening, args=(message, client_address)).start()
+
+
+            
+   
+
 
     def listen(self):
         send_thread = threading.Thread(target=self.client_send)
@@ -34,7 +52,7 @@ class Client(threading.Thread):
         receive_thread.start()
 
         # JUNIOR UNCOMMENT THIS, THE LINE BELOW IS SUPPOSE TO RECEIVE COMMAND FROM OTHER CLIENT FIRST AS UDP THEN TCP
-        clientrecv_udp_thread = threading.Thread(target=self.clientreceive_udp)
+        clientrecv_udp_thread = threading.Thread(target=self.create_socket())
         clientrecv_udp_thread.start()
 
     def clientreceive_udp(self):
@@ -86,22 +104,10 @@ class Client(threading.Thread):
 
     def client2clientUDP(self): # make a connection to client, should have received IP and port from server if it exists
         ip = input("What is the IP of client that holds the file: ")
-        port = input("What is the port of the client that holds the file: ")
-        filename = input(f"What is the filename: ")
-
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
-            message = f"CONNECT {filename}" # creates message to send to client
-            udp.sendto(message.encode('utf-8'), (ip, port)) # sends connect command to client
-            data, address = udp.recvfrom(BUFFER_SIZE) # waits for accept or reject
-            if data.decode('utf-8') == "ACCEPT": # if accept then close UDP
-                udp.close()
-                client_thread = threading.Thread(target=self.start_receiver(ip, port, filename)) # start TCP connection
-                client_thread.start()
-            else:
-                if data.decode('utf-8') == "REJECT":
-                    print(f"Rejected connection from {ip}:{port}. Could not receive file.")
-                    udp.close()
-
+        port = int(input("What is the port of the client that holds the file: "))
+        message = "conection: "
+        self.client2client_socket.sendto(message.encode('utf-8'), (ip, port))
+        
     def client_send(self): # send stuff to server or client
         while True:
             message = input("").strip()
@@ -115,12 +121,14 @@ class Client(threading.Thread):
                 self.filetransfer()
             elif message == "CLIENTCONNECT":  # this is for client2client command only, server will get it too
                 self.client2clientUDP()
+            
 
     def client_receive(self): # receive messages from server
         while True:
             try:
                 data, address = self.client2server_socket.recvfrom(BUFFER_SIZE)
                 message = data.decode('utf-8')
+
                 print(message)
             except Exception as e:
                 print(f'Error in receiving message: {e}')
@@ -175,5 +183,12 @@ class Client(threading.Thread):
         self.SERVER_IP = new_ip
         self.SERVER_PORT = new_port
 
+    def listening(self, message, client_address):
+        msg = message.decode('utf-8')
+        print(f"Message incoming from {client_address}")
+        # registration
+        if msg.startswith("conection"):
+            response = " accepte"
+            self.client2client_socket.sendto(response.encode('utf-8'), client_address)
 
 Client = Client()
