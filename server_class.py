@@ -57,7 +57,9 @@ class Server(threading.Thread):
                 _, username, ip, port = parts
                 if username in self.users:
                     response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
+                    notification = f"{username} denied registration."
                     print(f"Registration Denied for {username}.")
+                    self.send_notification(notification)
                 else:
                     self.users[username] = {"IP": ip, "port": port, "address": client_address, "files": []}
                     response = f"REGISTRATION CONFIRMED for {username}."
