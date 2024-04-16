@@ -91,6 +91,16 @@ class Server(threading.Thread):
                 else:
                     response = "UPDATE FAILED: User not found."
                 self.server_socket.sendto(response.encode('utf-8'), client_address)
+        
+        elif msg.startswith("REQUEST-INFO"):
+            user_update = "USERS INFORMATION: "
+            for username, user_details in self.users.items():
+                self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
+
+            for username, user_details in self.users.items():
+                user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
+                for username, user_details in self.users.items():
+                    self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
 
     def update(self):
       while True:
@@ -103,9 +113,8 @@ class Server(threading.Thread):
                for username, user_details in self.users.items():
                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
                    for username, user_details in self.users.items():
-                     self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
+                       self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
            time.sleep(60)
-
 
 def close(self):
         self.server_socket.close()
