@@ -47,7 +47,7 @@ class Server(threading.Thread):
 
     def listening(self, message, client_address):
         msg = message.decode('utf-8')
-        
+        print(f"for test Message incoming from {client_address}")
         # registration
         if msg.startswith("REGISTER"):
             parts = message.split()
@@ -114,6 +114,7 @@ class Server(threading.Thread):
                 for user in self.users:
                     if filename in self.users[user]["files"]:
                         response = f"File exists on server under {user}. adress: {self.users[user]['address']}"
+                        break
                     else:
                         response = f"File does not exist anywhere. Request for file: {filename} denied."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
@@ -134,7 +135,7 @@ class Server(threading.Thread):
                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']} available files: {user_details['files']}"
                    for username, user_details in self.users.items():
                      self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
-           time.sleep(60)
+           time.sleep(600)
 
 
 def close(self):
