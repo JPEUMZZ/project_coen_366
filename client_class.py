@@ -32,20 +32,9 @@ class Client(threading.Thread):
         receive_thread = threading.Thread(target=self.client_receive)
         receive_thread.start()
 
-        clientsend_udp_thread = threading.Thread(target=self.clientsend_udp)
-        clientsend_udp_thread.start()
-
         # JUNIOR UNCOMMENT THIS, THE LINE BELOW IS SUPPOSE TO RECEIVE COMMAND FROM OTHER CLIENT FIRST AS UDP THEN TCP
         #clientrecv_udp_thread = threading.Thread(target=self.clientreceive_udp)
         #clientrecv_udp_thread.start()
-
-    def clientsend_udp(self): # this checks if the client puts in console CLIENTCONNECT, then it will try to connect with client
-        while True:
-            message = input("").strip()
-            if message == "CLIENTCONNECT": # if input CLIENTCONNECT, ask for ip and port of the desired client
-                self.client2clientUDP()
-            else:
-                continue
 
     def clientreceive_udp(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -99,18 +88,18 @@ class Client(threading.Thread):
         port = input("What is the port of the client that holds the file: ")
         filename = input(f"What is the filename: ")
 
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
             message = f"CONNECT {filename}" # creates message to send to client
-            s.sendto(message.encode('utf-8'), (ip, port)) # sends connect command to client
-            data, address = s.recvfrom(BUFFER_SIZE) # waits for accept or reject
+            udp.sendto(message.encode('utf-8'), (ip, port)) # sends connect command to client
+            data, address = udp.recvfrom(BUFFER_SIZE) # waits for accept or reject
             if data.decode('utf-8') == "ACCEPT": # if accept then close UDP
-                s.close()
+                udp.close()
                 client_thread = threading.Thread(target=self.start_receiver(ip, port, filename)) # start TCP connection
                 client_thread.start()
             else:
                 if data.decode('utf-8') == "REJECT":
                     print(f"Rejected connection from {ip}:{port}. Could not receive file.")
-                    s.close()
+                    udp.close()
 
     def client_send(self): # send stuff to server or client
         while True:
@@ -123,6 +112,8 @@ class Client(threading.Thread):
                 self.uploadfile()
             elif message == "CHECKFILE": # send command to check which file you want to download if it exists
                 self.filetransfer()
+            elif message == "CLIENTCONNECT":  # this is for client2client command only, server will get it too
+                self.client2clientUDP()
 
     def client_receive(self): # receive messages from server
         while True:
