@@ -63,7 +63,7 @@ class Server(threading.Thread):
             else:
                 response = f"REGISTRATION-DENIED {parts[1]} Reason: Invalid registration message format."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
-            threading.Thread(target=self.send_update)
+            self.send_update()
 
         # deregister
         elif msg.startswith("DE-REGISTER"):
@@ -72,7 +72,7 @@ class Server(threading.Thread):
                 del self.users[username]
                 response = f"DE-REGISTER {req} {username}."
                 self.server_socket.sendto(response.encode('utf-8'), client_address)
-                threading.Thread(target=self.send_update)
+                self.send_update()
 
         # update IP address
         elif msg.startswith("UPDATE-CONTACT"):
@@ -85,7 +85,7 @@ class Server(threading.Thread):
                 else:
                     response = f"UPDATE-DENIED {req} {username}: User not found."
                 self.server_socket.sendto(response.encode('utf-8'), client_address)
-            threading.Thread(target=self.send_update)
+            self.send_update()
 
         # request info
         elif msg.startswith("REQUEST-INFO"):
@@ -94,7 +94,7 @@ class Server(threading.Thread):
                 self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
 
             for username, user_details in self.users.items():
-                user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
+                user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']} Files: {user_details['files']}"
                 for username, user_details in self.users.items():
                     self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
 
@@ -104,13 +104,13 @@ class Server(threading.Thread):
             if username in self.users:
                 if filename not in self.users[username]["files"]:
                     self.users[username]["files"].append(filename)
-                    response = f"Published {req}"
+                    response = f"PUBLISHED {req}"
                 else:
                     response = f"PUBLISH-DENIED {req} Reason: File already exists on server under {username}."
             else:
                 response = f"PUBLISH-DENIED {req} Reason: You do not have permission, as you are not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
-            threading.Thread(target=self.send_update)
+            self.send_update()
 
         # delete file
         elif msg.startswith("REMOVE"):
@@ -124,7 +124,7 @@ class Server(threading.Thread):
             else:
                 response = f"REMOVE-DENIED {req} Reason: You do not have permission, as you are not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
-            threading.Thread(target=self.send_update)
+            self.send_update()
 
         # transferfile, wants a file from someone
         elif msg.startswith("CHECKFILE"):
@@ -139,16 +139,15 @@ class Server(threading.Thread):
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
     def send_update(self):
-        while True:
-            if self.users:
-                user_update = "UPDATE: "
-                for username, user_details in self.users.items():
-                    self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
+        if self.users:
+            user_update = "UPDATE: "
+            for username, user_details in self.users.items():
+                self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
 
+            for username, user_details in self.users.items():
+                user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']} Files: {user_details['files']}"
                 for username, user_details in self.users.items():
-                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
-                    for username, user_details in self.users.items():
-                        self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
+                    self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
 
     def update(self):
         while True:
@@ -158,7 +157,7 @@ class Server(threading.Thread):
                     self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
 
                 for username, user_details in self.users.items():
-                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
+                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']} Files: {user_details['files']}"
                     for username, user_details in self.users.items():
                         self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
             time.sleep(300)
