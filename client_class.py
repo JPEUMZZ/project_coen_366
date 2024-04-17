@@ -41,7 +41,7 @@ class Client(threading.Thread):
 
     def ClientFileProvider_udp(self): # the client that wants to receive file, will initially make request
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.bind((self.CLIENT_IP, self.CLIENT_PORT)
+            s.bind((self.CLIENT_IP, self.CLIENT_PORT))
             while True: # want to continuously listen for anything from other clients
                 data, address = s.recvfrom(BUFFER_SIZE)
                 clientrecv_thread = threading.Thread(target=self.ClientFileProvider_Thread, args=(s, data, address))
