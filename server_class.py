@@ -72,7 +72,7 @@ class Server(threading.Thread):
                 del self.users[username]
                 response = f"DE-REGISTER {req} {username}."
                 self.server_socket.sendto(response.encode('utf-8'), client_address)
-                self.update()
+                threading.Thread(target=self.send_update)
 
         # update IP address
         elif msg.startswith("UPDATE-CONTACT"):
@@ -82,10 +82,10 @@ class Server(threading.Thread):
                 if username in self.users:
                     self.users[username] = {"IP": new_ip, "port": new_udp_socket, "address": client_address}
                     response = f"UPDATE-CONFIRMED {req} {username} {new_ip} {new_udp_socket}"
-                    self.update()
                 else:
                     response = f"UPDATE-DENIED {req} {username}: User not found."
                 self.server_socket.sendto(response.encode('utf-8'), client_address)
+            threading.Thread(target=self.send_update)
 
         # request info
         elif msg.startswith("REQUEST-INFO"):
@@ -105,12 +105,12 @@ class Server(threading.Thread):
                 if filename not in self.users[username]["files"]:
                     self.users[username]["files"].append(filename)
                     response = f"Published {req}"
-                    self.update()
                 else:
                     response = f"PUBLISH-DENIED {req} Reason: File already exists on server under {username}."
             else:
                 response = f"PUBLISH-DENIED {req} Reason: You do not have permission, as you are not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
+            threading.Thread(target=self.send_update)
 
         # delete file
         elif msg.startswith("REMOVE"):
@@ -119,12 +119,12 @@ class Server(threading.Thread):
                 if filename in self.users[username]["files"]:
                     self.users[username]["files"].remove(filename)
                     response = f"REMOVED {req}"
-                    self.update()
                 else:
                     response = f"REMOVE-DENIED {req} Reason: File does not exist under {username}. Could not delete file."
             else:
                 response = f"REMOVE-DENIED {req} Reason: You do not have permission, as you are not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
+            threading.Thread(target=self.send_update)
 
         # transferfile, wants a file from someone
         elif msg.startswith("CHECKFILE"):
