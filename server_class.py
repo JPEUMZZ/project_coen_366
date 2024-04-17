@@ -1,7 +1,7 @@
 import socket
 import sys
 import threading
-import json
+import time
 
 BUFFER_SIZE = 1024
 
@@ -35,6 +35,7 @@ class Server(threading.Thread):
 
         print("Socket configured. Server is up.")
         print(f"UDP server is listening on {self.SERVER_IP}:{self.PORT}")
+        update_thread = threading.Thread(target=self.update).start()
         while True: # listens on socket, then creates thread for each received
             message, client_address = self.server_socket.recvfrom(BUFFER_SIZE)
             threading.Thread(target=self.listening, args=(message, client_address)).start()
@@ -52,62 +53,77 @@ class Server(threading.Thread):
         # registration
         if msg.startswith("REGISTER"):
             parts = message.split()
-            if len(parts) == 4:
-                _, username, ip, port = parts
+            if len(parts) == 5:
+                _, req, username, ip, port = parts
                 if username in self.users:
-                    response = f"REGISTRATION DENIED for {username}. Reason: Username already in use."
-                    notification = f"{username} denied registration."
-                    print(f"Registration Denied for {username}.")
-                    self.send_notification(notification)
+                    response = f"REGISTRATION-DENIED {req} Reason: Username already in use."
                 else:
                     self.users[username] = {"IP": ip, "port": port, "address": client_address, "files": []}
-                    response = f"REGISTRATION CONFIRMED for {username}."
-                    notification = f"{username} has registered."
-                    self.send_notification(notification)
+                    response = f"REGISTERED {req}"
             else:
-                response = "Invalid registration message format."
+                response = f"REGISTRATION-DENIED {parts[1]} Reason: Invalid registration message format."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
+            threading.Thread(target=self.send_update)
 
         # deregister
-        elif msg.startswith("DEREGISTER"):
-            _, username = message.split()
+        elif msg.startswith("DE-REGISTER"):
+            _, req, username = message.split()
             if username in self.users:
                 del self.users[username]
-                response = f"{username} deregistered successfully."
-                notification = f"{username} has deregistered."
-                self.send_notification(notification)
-            else:
-                response = f"{username} is not registered. Could not deregister."
-            self.server_socket.sendto(response.encode('utf-8'), client_address)
+                response = f"DE-REGISTER {req} {username}."
+                self.server_socket.sendto(response.encode('utf-8'), client_address)
+                self.update()
+
+        # update IP address
+        elif msg.startswith("UPDATE-CONTACT"):
+            parts = message.split()
+            if len(parts) == 5:
+                _, req, username, new_ip, new_udp_socket = parts
+                if username in self.users:
+                    self.users[username] = {"IP": new_ip, "port": new_udp_socket, "address": client_address}
+                    response = f"UPDATE-CONFIRMED {req} {username} {new_ip} {new_udp_socket}"
+                    self.update()
+                else:
+                    response = f"UPDATE-DENIED {req} {username}: User not found."
+                self.server_socket.sendto(response.encode('utf-8'), client_address)
+
+        # request info
+        elif msg.startswith("REQUEST-INFO"):
+            user_update = "USERS INFORMATION: "
+            for username, user_details in self.users.items():
+                self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
+
+            for username, user_details in self.users.items():
+                user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
+                for username, user_details in self.users.items():
+                    self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
 
         # wants to say that it has this file
-        elif msg.startswith("UPLOADFILE"):
-            _, username, filename = message.split()
+        elif msg.startswith("PUBLISH"):
+            _, req, username, filename = message.split()
             if username in self.users:
                 if filename not in self.users[username]["files"]:
                     self.users[username]["files"].append(filename)
-                    response = f"{username} uploaded {filename} successfully."
-                    notification = f"{username} has uploaded {filename} onto server."
-                    self.send_notification(notification)
+                    response = f"Published {req}"
+                    self.update()
                 else:
-                    response = f"File already exists on server under {username}. Did not append."
+                    response = f"PUBLISH-DENIED {req} Reason: File already exists on server under {username}."
             else:
-                response = f"You do not have permission, as you are not registered."
+                response = f"PUBLISH-DENIED {req} Reason: You do not have permission, as you are not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
         # delete file
-        elif msg.startswith("DELETEFILE"):
-            _, username, filename = message.split()
+        elif msg.startswith("REMOVE"):
+            _, req, username, filename = message.split()
             if username in self.users:
                 if filename in self.users[username]["files"]:
                     self.users[username]["files"].remove(filename)
-                    response = f"{username} deleted {filename} successfully."
-                    notification = f"{username} has deleted {filename} from server."
-                    self.send_notification(notification)
+                    response = f"REMOVED {req}"
+                    self.update()
                 else:
-                    response = f"File does not exist under {username}. Could not delete file."
+                    response = f"REMOVE-DENIED {req} Reason: File does not exist under {username}. Could not delete file."
             else:
-                response = f"You do not have permission, as you are not registered."
+                response = f"REMOVE-DENIED {req} Reason: You do not have permission, as you are not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
         # transferfile, wants a file from someone
@@ -122,9 +138,30 @@ class Server(threading.Thread):
                         response = f"File does not exist anywhere. Request for file: {filename} denied."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
-        # do nothing here, just taking file from client
-        elif msg.startswith("CLIENTCONNECT"): # this message is meant to be sent to other clients
-            pass
+    def send_update(self):
+        while True:
+            if self.users:
+                user_update = "UPDATE: "
+                for username, user_details in self.users.items():
+                    self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
+
+                for username, user_details in self.users.items():
+                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
+                    for username, user_details in self.users.items():
+                        self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
+
+    def update(self):
+        while True:
+            if self.users:
+                user_update = "UPDATE: "
+                for username, user_details in self.users.items():
+                    self.server_socket.sendto(user_update.encode('utf-8'), user_details["address"])
+
+                for username, user_details in self.users.items():
+                    user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']}"
+                    for username, user_details in self.users.items():
+                        self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
+            time.sleep(300)
 
     def close(self):
         self.server_socket.close()

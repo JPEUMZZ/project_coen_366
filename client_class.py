@@ -14,7 +14,7 @@ class Client(threading.Thread):
 
         self.HOST_NAME = socket.gethostname()
         self.CLIENT_IP = self.client2server_socket.gethostbyname(self.HOST_NAME)
-        self.CLIENT_PORT = int(4000)
+        self.CLIENT_PORT = None
 
         self.SERVER_IP = input("Which Server IP would you like to connect to: ")
         self.SERVER_PORT = int(input("What is the server port: "))
@@ -25,6 +25,13 @@ class Client(threading.Thread):
         except socket.error as msg:
             print(f"Error creating socket. Code {str(msg[0])}: {str(msg[1])}")
             sys.exit()
+
+        self.CLIENT_PORT = int(input("What is the desired Client2Client port number: "))
+        split = self.CLIENT_IP.split('.')
+        concat = ''
+        for num in split:
+            concat += num
+        self.RQ = int(concat + str(self.CLIENT_PORT))
 
         self.register()
         self.listen()
@@ -69,24 +76,44 @@ class Client(threading.Thread):
                 print(f'Error in receiving message: {e}')
 
     def register(self):
-        message = f"REGISTER {self.username} {self.CLIENT_IP} {self.SERVER_PORT}"
+        self.RQ += 1
+        message = f"REGISTER {self.RQ} {self.username} {self.CLIENT_IP} {self.CLIENT_PORT}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
     def deregister(self):
-        message = f"DEREGISTER {self.username}"
+        self.RQ += 1
+        message = f"DE-REGISTER {self.RQ} {self.username}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
-    def uploadfile(self): # upload file to server if you want others to see it
+    def update_contact(self):
+        self.RQ += 1
+        new_ip = input("What's your new IP address? ")
+        new_port = int(input("What's your new port number? "))
+        update_message = f"UPDATE-CONTACT {self.RQ} {self.username} {new_ip} {new_port}"
+
+        self.client2server_socket.sendto(update_message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
+        self.SERVER_IP = new_ip
+        self.SERVER_PORT = new_port
+
+    def request_info(self):
+        self.RQ += 1
+        message = f"REQUEST-INFO"
+        self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
+
+    def publish(self): # upload file to server if you want others to see it
+        self.RQ += 1
         filename = input("What is the name of the file you would like to upload to server: ")
-        message = f"UPLOADFILE {self.username} {filename}"
+        message = f"PUBLISH {self.RQ} {self.username} {filename}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
-    def deletefile(self):
+    def remove(self):
+        self.RQ += 1
         filename = input("Which file would you like to delete?: ")
-        message = f"DELETEFILE {self.username} {filename}"
+        message = f"REMOVE {self.RQ} {self.username} {filename}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
     def filetransfer(self): # ask server if file exists
+        self.RQ += 1
         filename = input("Which file would you like to check from server?: ")
         message = f"CHECKFILE {self.username} {filename}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
@@ -100,6 +127,7 @@ class Client(threading.Thread):
             message = f"CONNECT {filename}" # creates message to send to client
             udp.sendto(message.encode('utf-8'), (ip, int(port))) # sends connect command to client
             data, address = udp.recvfrom(BUFFER_SIZE) # waits for accept or reject
+
             if data.decode('utf-8') == "ACCEPT": # if accept then close UDP
                 udp.close()
                 print(f"{address} has accepted connection. Attempting to establish TCP.")
@@ -114,12 +142,16 @@ class Client(threading.Thread):
             message = input("").strip()
             if message == "REGISTER":
                 self.register()
-            elif message == "DEREGISTER":
+            elif message == "DE-REGISTER":
                 self.deregister()
-            elif message == "UPLOADFILE": # send command to upload file to server
-                self.uploadfile()
-            elif message == "DELETEFILE": # delete file if exists
-                self.deletefile()
+            elif message.startswith("UPDATE-CONTACT"):
+                self.update_contact()
+            elif message.startswith("REQUEST-INFO"):
+                self.request_info()
+            elif message == "PUBLISH": # send command to upload file to server
+                self.publish()
+            elif message == "REMOVE": # delete file if exists
+                self.remove()
             elif message == "CHECKFILE": # send command to check which file you want to download if it exists
                 self.filetransfer()
             elif message == "CLIENTCONNECT":  # this is for client2client command only, server will get it too
