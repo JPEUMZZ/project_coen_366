@@ -2,6 +2,7 @@ import socket
 import sys
 import threading
 import time
+import os
 
 BUFFER_SIZE = 1024
 
@@ -13,6 +14,17 @@ class Server(threading.Thread):
         self.SERVER_IP = self.server_socket.gethostbyname(self.HOST_NAME) # host
         self.PORT = port # port number
         self.users = {}
+
+        if os.path.exists("backup.txt"):
+            with open("backup.txt", "r") as file:
+                for line in file:
+                    parts = line.strip().split()
+                    username = parts[0]
+                    ip = parts[1]
+                    port = parts[2]
+                    address = parts[3]
+                    files = parts[4:] if len(parts) > 4 else []
+                    self.users[username] = {"IP": ip, "port": port, "address": address, "files": files}
 
 
         self.create_socket()
@@ -80,8 +92,9 @@ class Server(threading.Thread):
             parts = message.split()
             if len(parts) == 5:
                 _, req, username, new_ip, new_udp_socket = parts
+                files = self.users[username]['files']
                 if username in self.users:
-                    self.users[username] = {"IP": new_ip, "port": new_udp_socket, "address": client_address}
+                    self.users[username] = {"IP": new_ip, "port": new_udp_socket, "address": client_address, "files": files}
                     response = f"UPDATE-CONFIRMED {req} {username} {new_ip} {new_udp_socket}"
                 else:
                     response = f"UPDATE-DENIED {req} {username}: User not found."
@@ -161,7 +174,12 @@ class Server(threading.Thread):
                     user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']} Files: {user_details['files']}"
                     for username, user_details in self.users.items():
                         self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
-            time.sleep(300)
+            time.sleep(10)
+
+    # def backup(self):
+    #     with open("backup.txt", "w") as file:
+    #         for user in self.users:
+    #             file.write(user[''])
 
     def close(self):
         self.server_socket.close()

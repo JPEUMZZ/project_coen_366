@@ -89,7 +89,7 @@ class Client(threading.Thread):
 
     def update_contact(self):
         self.RQ += 1
-        new_ip = input("What's your new IP address? ")
+        new_ip = self.client2client_socket.gethostbyname(self.HOST_NAME)
         new_port = int(input("What's your new port number? "))
         update_message = f"UPDATE-CONTACT {self.RQ} {self.username} {new_ip} {new_port}"
 
@@ -177,7 +177,7 @@ class Client(threading.Thread):
                 tcp.settimeout(timeout)
                 print(f"Attemping to TCP connect to {IP}:{port} now.")
                 tcp.connect((IP, port))
-                with open(filename, 'wb') as file: # write into file
+                with open(filename, 'w') as file: # write into file
                     print(f"Downloading file: {filename}")
                     while True:
                         data, address = tcp.recv(BUFFER_SIZE)
@@ -199,7 +199,7 @@ class Client(threading.Thread):
                 tcp.listen(1)
                 connection, client_address = tcp.accept()
                 print(f"Connection established with {client_address}")
-                with open(filename, 'rb') as file:
+                with open(filename, 'r') as file:
                     print(f"Sending {filename} now.")
                     while True:
                         char = file.read(BUFFER_SIZE)
