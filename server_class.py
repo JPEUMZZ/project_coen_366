@@ -174,7 +174,7 @@ class Server(threading.Thread):
                     user_info = f"Username: {username} IP: {user_details['IP']} Port: {user_details['port']} Files: {user_details['files']}"
                     for username, user_details in self.users.items():
                         self.server_socket.sendto(user_info.encode('utf-8'), user_details["address"])
-            time.sleep(10)
+            time.sleep(300)
 
     # def backup(self):
     #     with open("backup.txt", "w") as file:
