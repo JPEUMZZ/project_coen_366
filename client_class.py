@@ -51,8 +51,10 @@ class Client(threading.Thread):
             s.bind((self.CLIENT_IP, self.CLIENT_PORT))
             while True: # want to continuously listen for anything from other clients
                 data, address = s.recvfrom(BUFFER_SIZE)
-                clientrecv_thread = threading.Thread(target=self.ClientFileProvider_Thread, args=(s, data, address))
-                clientrecv_thread.start()
+                if data.decode('utf-8').startswith("CONNECT"):
+                    print("we are here")
+                    clientrecv_thread = threading.Thread(target=self.ClientFileProvider_Thread, args=(s, data, address))
+                    clientrecv_thread.start()
             socket.close()
 
     def ClientFileProvider_Thread(self, socketUDP, data, address):
