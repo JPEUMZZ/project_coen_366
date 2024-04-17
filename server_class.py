@@ -13,8 +13,8 @@ class Server(threading.Thread):
         self.SERVER_IP = self.server_socket.gethostbyname(self.HOST_NAME) # host
         self.PORT = port # port number
         self.users = {}
+
         self.create_socket()
-        self.mutex = threading.Lock()
 
     def create_socket(self):
         try:
@@ -26,7 +26,6 @@ class Server(threading.Thread):
             sys.exit()
 
         print("Created socket...")
-
         try:
             self.server_socket.bind((self.SERVER_IP, self.PORT))  # server IP and port number
 
@@ -36,7 +35,7 @@ class Server(threading.Thread):
 
         print("Socket configured. Server is up.")
         print(f"UDP server is listening on {self.SERVER_IP}:{self.PORT}")
-        while True: # listens on socket, then creates thread
+        while True: # listens on socket, then creates thread for each received
             message, client_address = self.server_socket.recvfrom(BUFFER_SIZE)
             threading.Thread(target=self.listening, args=(message, client_address)).start()
 
@@ -78,7 +77,7 @@ class Server(threading.Thread):
                 notification = f"{username} has deregistered."
                 self.send_notification(notification)
             else:
-                response = f"{username} is not registered."
+                response = f"{username} is not registered. Could not deregister."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
 
         # wants to say that it has this file
@@ -92,6 +91,21 @@ class Server(threading.Thread):
                     self.send_notification(notification)
                 else:
                     response = f"File already exists on server under {username}. Did not append."
+            else:
+                response = f"You do not have permission, as you are not registered."
+            self.server_socket.sendto(response.encode('utf-8'), client_address)
+
+        # delete file
+        elif msg.startswith("DELETEFILE"):
+            _, username, filename = message.split()
+            if username in self.users:
+                if filename in self.users[username]["files"]:
+                    self.users[username]["files"].remove(filename)
+                    response = f"{username} deleted {filename} successfully."
+                    notification = f"{username} has deleted {filename} from server."
+                    self.send_notification(notification)
+                else:
+                    response = f"File does not exist under {username}. Could not delete file."
             else:
                 response = f"You do not have permission, as you are not registered."
             self.server_socket.sendto(response.encode('utf-8'), client_address)
@@ -117,5 +131,4 @@ class Server(threading.Thread):
 
 SERVER_PORT = 3000
 server = Server(SERVER_PORT)
-server.start()
 server.close()

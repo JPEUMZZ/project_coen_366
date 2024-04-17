@@ -2,6 +2,7 @@ import socket
 import sys
 import threading
 import os
+from random import random
 
 BUFFER_SIZE = 1024
 
@@ -40,7 +41,7 @@ class Client(threading.Thread):
 
     def ClientFileProvider_udp(self): # the client that wants to receive file, will initially make request
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.bind((self.CLIENT_IP, self.SERVER_PORT))
+            s.bind((self.CLIENT_IP, self.CLIENT_PORT)
             while True: # want to continuously listen for anything from other clients
                 data, address = s.recvfrom(BUFFER_SIZE)
                 clientrecv_thread = threading.Thread(target=self.ClientFileProvider_Thread, args=(s, data, address))
@@ -80,6 +81,11 @@ class Client(threading.Thread):
         message = f"UPLOADFILE {self.username} {filename}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
+    def deletefile(self):
+        filename = input("Which file would you like to delete?: ")
+        message = f"DELETEFILE {self.username} {filename}"
+        self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
+
     def filetransfer(self): # ask server if file exists
         filename = input("Which file would you like to check from server?: ")
         message = f"CHECKFILE {self.username} {filename}"
@@ -112,6 +118,8 @@ class Client(threading.Thread):
                 self.deregister()
             elif message == "UPLOADFILE": # send command to upload file to server
                 self.uploadfile()
+            elif message == "DELETEFILE": # delete file if exists
+                self.deletefile()
             elif message == "CHECKFILE": # send command to check which file you want to download if it exists
                 self.filetransfer()
             elif message == "CLIENTCONNECT":  # this is for client2client command only, server will get it too
