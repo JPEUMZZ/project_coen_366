@@ -40,7 +40,7 @@ class Client(threading.Thread):
 
     def ClientFileProvider_udp(self): # the client that wants to receive file, will initially make request
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.bind((self.CLIENT_IP, self.SERVER_PORT))
+            s.bind((self.CLIENT_IP, self.CLIENT_PORT))
             while True: # want to continuously listen for anything from other clients
                 data, address = s.recvfrom(BUFFER_SIZE)
                 clientrecv_thread = threading.Thread(target=self.ClientFileProvider_Thread, args=(s, data, address))
@@ -89,19 +89,17 @@ class Client(threading.Thread):
         ip = input("What is the IP of client that holds the file: ")
         port = input("What is the port of the client that holds the file: ")
         filename = input(f"What is the filename: ")
+        message = f"CONNECT {filename}" # creates message to send to client
+        self.client2server_socket.sendto(message.encode('utf-8'), (ip, int(port))) # sends connect command to client
+        #data, address = self.client2server_socket.recvfrom(BUFFER_SIZE) # waits for accept or reject
 
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
-            message = f"CONNECT {filename}" # creates message to send to client
-            udp.sendto(message.encode('utf-8'), (ip, int(port))) # sends connect command to client
-            data, address = udp.recvfrom(BUFFER_SIZE) # waits for accept or reject
-            if data.decode('utf-8') == "ACCEPT": # if accept then close UDP
-                udp.close()
-                print(f"{address} has accepted connection. Attempting to establish TCP.")
-                self.start_receiver(ip, port, filename) # start TCP connection
-            else:
-                if data.decode('utf-8') == "REJECT":
-                    print(f"Rejected connection from {ip}:{port}. Could not receive file.")
-                    udp.close()
+       # if data.decode('utf-8') == "ACCEPT": # if accept then close UDP   
+       #         print(f"{address} has accepted connection. Attempting to establish TCP.")
+       #         self.start_receiver(ip, port, filename) # start TCP connection
+        #else:
+       #     if data.decode('utf-8') == "REJECT":
+        #         print(f"Rejected connection from {ip}:{port}. Could not receive file.")
+                    
 
     def client_send(self): # send stuff to server or client
         while True:
