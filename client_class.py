@@ -13,14 +13,17 @@ class Client(threading.Thread):
 
         self.HOST_NAME = socket.gethostname()
         self.CLIENT_IP = self.client2server_socket.gethostbyname(self.HOST_NAME)
-        self.CLIENT_PORT = int(4000)
+        
 
         self.SERVER_IP = input("Which Server IP would you like to connect to: ")
         self.SERVER_PORT = int(input("What is the server port: "))
+        self.CLIENT_PORT = int(input("What is your port: "))
         self.username = input(f"Enter you name: ").strip()
 
         try:
             self.client2server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.client2client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.client2client_socket.bind((self.CLIENT_IP, self.CLIENT_PORT))
         except socket.error as msg:
             print(f"Error creating socket. Code {str(msg[0])}: {str(msg[1])}")
             sys.exit()
@@ -39,13 +42,13 @@ class Client(threading.Thread):
         clientrecv_udp_thread.start()
 
     def ClientFileProvider_udp(self): # the client that wants to receive file, will initially make request
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.bind((self.CLIENT_IP, self.SERVER_PORT))
-            while True: # want to continuously listen for anything from other clients
-                data, address = s.recvfrom(BUFFER_SIZE)
-                clientrecv_thread = threading.Thread(target=self.ClientFileProvider_Thread, args=(s, data, address))
-                clientrecv_thread.start()
-            socket.close()
+        while True: # want to continuously listen for anything from other clients
+            data, address = self.client2client_socket.recvfrom(BUFFER_SIZE)
+            if(data.startswith('CONNECT')):
+                h
+            print(data)
+            
+           
 
     def ClientFileProvider_Thread(self, socketUDP, data, address):
         message = data.decode('utf-8')
@@ -68,7 +71,7 @@ class Client(threading.Thread):
                 print(f'Error in receiving message: {e}')
 
     def register(self):
-        message = f"REGISTER {self.username} {self.CLIENT_IP} {self.SERVER_PORT}"
+        message = f"REGISTER {self.username} {self.CLIENT_IP} {self.CLIENT_PORT}"
         self.client2server_socket.sendto(message.encode('utf-8'), (self.SERVER_IP, self.SERVER_PORT))
 
     def deregister(self):
@@ -153,7 +156,7 @@ class Client(threading.Thread):
     def start_sender(self, address, filename): # client that will send file to receiver
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcp:
             try:
-                tcp.bind(address)
+                tcp.bind((self.CLIENT_IP,self.CLIENT_PORT ))
                 tcp.listen(1)
                 connection, client_address = tcp.accept()
                 print(f"Connection established with {client_address}")
